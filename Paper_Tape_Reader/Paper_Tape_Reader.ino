@@ -563,14 +563,14 @@ void main_runmode ()
 
   // output the byte to Serial (USB), and to Serial1 (TX) if enabled
   if (digitalRead (IN_5BIT) == OFF) {         // 5-bit jumper open: 8-bit mode
-    Serial.write(b);
-    SERIAL_WRITE(b);               
+    Serial.write((char)(255-b));
+    SERIAL_WRITE((char)(255-b));               
   } else if (digitalRead (IN_TST) == OFF){    // 5-bit jumper set, TST jumper open: 5-bit mode
-    Serial.write((b>>1) & 0x1F);
-    SERIAL_WRITE((b>>1) & 0x1F);   
+    Serial.write((char)(255-(b>>1) & 0x1F));
+    SERIAL_WRITE((char)(255-(b>>1) & 0x1F));   
   } else {                                    // 5-bit jumper and TST jumper set: 7-bit mode
-    Serial.write(b & 0x7F);
-    SERIAL_WRITE(b & 0x7F);       
+    Serial.write((char)(255-b & 0x7F));
+    SERIAL_WRITE((char)(255-b & 0x7F));       
   }
 }
 
