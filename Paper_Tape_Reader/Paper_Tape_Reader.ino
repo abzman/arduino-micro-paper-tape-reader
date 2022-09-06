@@ -331,7 +331,7 @@ boolean cal_read_data ()
     calibData[i].min = 255;  
   }  
   
-  for (j=0; j<50; j++) {
+  for (j=0; j<100; j++) {
 
     // wait for feed hole to go and come, with 10s timeout
     endtime = millis() + timeout;
@@ -341,15 +341,7 @@ boolean cal_read_data ()
     digitalWrite (LED_FEED, ON);
     if (millis() >= endtime) break;
 
-    // read all 8 data bits (quickly)
-    ad[0] = analogRead (AN_D0) >> 2;
-    ad[1] = analogRead (AN_D1) >> 2;
-    ad[2] = analogRead (AN_D2) >> 2;
-    ad[3] = analogRead (AN_D3) >> 2;
-    ad[4] = analogRead (AN_D4) >> 2;
-    ad[5] = analogRead (AN_D5) >> 2;
-    ad[6] = analogRead (AN_D6) >> 2;
-    ad[7] = analogRead (AN_D7) >> 2;  
+    readAnalog();
 
     // process data
     for (i=0; i<8; i++) {
@@ -492,15 +484,7 @@ void main_testmode ()
 
   // capture all 9 inputs
   TX_ON;
-  ad[0] = analogRead (AN_D0) >> 2;
-  ad[1] = analogRead (AN_D1) >> 2;
-  ad[2] = analogRead (AN_D2) >> 2;
-  ad[3] = analogRead (AN_D3) >> 2;
-  ad[4] = analogRead (AN_D4) >> 2;
-  ad[5] = analogRead (AN_D5) >> 2;
-  ad[6] = analogRead (AN_D6) >> 2;
-  ad[7] = analogRead (AN_D7) >> 2;
-  ad[8] = analogRead (AN_FEED) >> 2;
+  readAnalog();
   TX_OFF;
 
   // display all ADC levels, with inversion as selected by INV jumper
@@ -536,14 +520,7 @@ void main_runmode ()
 
   // read all 8 data bits (quickly)
   TX_ON;                            // begin conversion
-  ad[0] = analogRead (AN_D0) >> 2;
-  ad[1] = analogRead (AN_D1) >> 2;
-  ad[2] = analogRead (AN_D2) >> 2;
-  ad[3] = analogRead (AN_D3) >> 2;
-  ad[4] = analogRead (AN_D4) >> 2;
-  ad[5] = analogRead (AN_D5) >> 2;
-  ad[6] = analogRead (AN_D6) >> 2;
-  ad[7] = analogRead (AN_D7) >> 2;
+  readAnalog();
   TX_OFF;                           // end conversion
 
   // set valid mask to ignore bits at the edges of the tape
@@ -595,4 +572,17 @@ void loop()
     // otherwise, read one byte triggered by feed track and write to USB
     main_runmode ();
   }
+}
+
+void readAnalog()
+{
+    // read all 8 data bits (quickly)
+    ad[0] = analogRead (AN_D0) >> 2;
+    ad[1] = analogRead (AN_D1) >> 2;
+    ad[2] = analogRead (AN_D2) >> 2;
+    ad[3] = analogRead (AN_D3) >> 2;
+    ad[4] = analogRead (AN_D4) >> 2;
+    ad[5] = analogRead (AN_D5) >> 2;
+    ad[6] = analogRead (AN_D6) >> 2;
+    ad[7] = analogRead (AN_D7) >> 2; 
 }
