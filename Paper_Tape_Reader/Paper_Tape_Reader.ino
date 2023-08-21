@@ -1,6 +1,6 @@
 /*
     Manual Paper Tape Reader with USB Serial (CDC) Interface
-   
+
     For Sparkfun/Arduino Pro Micro (ATmega 32U4), 5V/16MHz version.
     Optical reader with LED/phototransistor pairs for each data bit and feed track;
     analog input of phototransistor signals for automatic threshold adaptation.
@@ -14,7 +14,7 @@
     *** LEDs
 
     FEED  flashes once for every valid feed hole detected during operation and calibration
-    
+
     CAL   steady ON:        calibration mode is active
           flashing 1 Hz:    waiting for user to start calibration (press CAL button), or 10 s timeout
           flashing 10 Hz:   error during calibration process
@@ -22,9 +22,9 @@
 
 
     *** Jumpers
-     
-    Three different tape widths can be set via jumpers. (Setting them is recommended 
-    to avoid "CAL" indications from invalid detection levels at the tape edges, 
+
+    Three different tape widths can be set via jumpers. (Setting them is recommended
+    to avoid "CAL" indications from invalid detection levels at the tape edges,
     and mask invalid bits from the output bytes.)
 
     Bits    Tape placement    Jumper settings
@@ -42,26 +42,26 @@
     and can be calibrated by pushing the CAL button. Status output during calibration
     is provided via test messages (USB) and via the CAL LED.
 
-    * Press CAL once: View current calibration.
-      Current calibration values are printed via USB, 
+      Press CAL once: View current calibration.
+      Current calibration values are printed via USB,
       CAL LED blinks at 1 Hz.
-    
-    * Press CAL again within 10 seconds: Enter calibration mode.
-      Prompts user to start feeding tape, 
+
+      Press CAL again within 10 seconds: Enter calibration mode.
+      Prompts user to start feeding tape,
       CAL LED on.
 
-    * Feed tape, beginning within 10 seconds:
+      Feed tape, beginning within 10 seconds:
       Approx. 30 cm of sample tape are required.
-      Ideally all data bits should be exercised in the sample, 
-      but if no significant contrast is detected for a data channel, 
+      Ideally all data bits should be exercised in the sample,
+      but if no significant contrast is detected for a data channel,
       averaged thresholds from the other channels will be used.
       CAL LED stays on, FEED LED begins to flash when valid feed holes are seen.
 
-    * Calibration automatically ends when enough sample tape has been processed,
+      Calibration automatically ends when enough sample tape has been processed,
       or when one of the 10 second timeouts mentioned above is reached.
-      Results and final status are printed via USB; 
+      Results and final status are printed via USB;
       errors are also signalled by rapid flashing of the CAL LED for 1 second.
-      CAL LED is then switched off. 
+      CAL LED is then switched off.
 */
 
 #include <EEPROM.h>
@@ -113,7 +113,7 @@
 #define IN_TST  3                 // jumper enables raw data output for testing
 #define OUT_TX  1                 // general signaling & debugging - also serial TX
 
-// I/O levels -- all digital inputs and outputs are active low 
+// I/O levels -- all digital inputs and outputs are active low
 #define ON 0
 #define OFF 1
 
@@ -121,6 +121,9 @@
 // global constants and variables
 // ===========================
 
+byte adMax[9];
+byte adMin[9] = {255, 255, 255, 255, 255, 255, 255, 255, 255};
+byte ad[9];
 // calibration values per channel
 struct calibRec {
   byte min;       // lowest value read
@@ -148,10 +151,10 @@ const long timeout = 10000;       // 10 s timeout at various calibration steps
 
 
 // ===========================
-// initialize 
+// initialize
 // ===========================
 
-void setup() 
+void setup()
 {
   // Initialize digital I/O pins.
   pinMode (IN_CAL, INPUT_PULLUP);
@@ -162,23 +165,23 @@ void setup()
   pinMode (LED_FEED, OUTPUT);
   pinMode (LED_CAL, OUTPUT);
 
-  digitalWrite (LED_FEED, OFF);  
-  digitalWrite (LED_CAL, OFF);  
+  digitalWrite (LED_FEED, OFF);
+  digitalWrite (LED_CAL, OFF);
   TX_OFF;
-  
+
   // Initialize USB serial comm.
   // Don't check for availability of the serial port; USB might be used for power supply only
-  Serial.begin(9600);                 // baud rate is a dummy, not relevant for CDC
+  Serial.begin(115200);                 // baud rate is a dummy, not relevant for CDC
 
   // Initialize serial TX if enabled
-  SERIAL_INIT(9600);
+  SERIAL_INIT(115200);
 
-  // set ADC clock prescaler. 
+  // set ADC clock prescaler.
   // 1 MHz gives stable results, 2 MHz gets noisy on some channels
   // ADCSRA = (ADCSRA&0xF80)|0x03;    // 1/8 (2 MHz ADC clock)
-  ADCSRA = (ADCSRA&0xF80)|0x04;       // 1/16 (1 MHz ADC clock)
+  ADCSRA = (ADCSRA & 0xF80) | 0x04;   // 1/16 (1 MHz ADC clock)
 
-  // Read calibration data from EEPROM. 
+  // Read calibration data from EEPROM.
   EEPROM.get (addrData, calibData);
   EEPROM.get (addrFeed, calibFeed);
 }
@@ -195,7 +198,7 @@ void cal_print_feed ()
 {
   Serial.println  ();
   Serial.println  ("\tFeed track calibration");
-  Serial.println  ("\tBit\tMin\tMax\tMod\tLow\tHigh"); 
+  Serial.println  ("\tBit\tMin\tMax\tMod\tLow\tHigh");
   Serial.print    ("\tFeed\t");
   Serial.print    (calibFeed.min);  Serial.print ("\t");
   Serial.print    (calibFeed.max);  Serial.print ("\t");
@@ -211,10 +214,10 @@ void cal_print_feed ()
 void cal_print_data ()
 {
   byte i;
-  Serial.println ();    
+  Serial.println ();
   Serial.println ("\tData calibration");
-  Serial.println ("\tBit\tMin\tMax\tMod\tLow\tHigh"); 
-  for (i=0; i<8; i++) {
+  Serial.println ("\tBit\tMin\tMax\tMod\tLow\tHigh");
+  for (i = 0; i < 8; i++) {
     Serial.print ("\t");
     Serial.print (i);                  Serial.print ("\t");
     Serial.print (calibData[i].min);   Serial.print ("\t");
@@ -222,7 +225,7 @@ void cal_print_data ()
     Serial.print (calibData[i].mod);   Serial.print ("%\t");
     Serial.print (calibData[i].low);   Serial.print ("\t");
     Serial.print (calibData[i].high);  Serial.print ("\t");
-    if (calibData[i].est) Serial.print ("interpolated"); 
+    if (calibData[i].est) Serial.print ("interpolated");
     Serial.println ();
   }
 }
@@ -237,12 +240,12 @@ boolean cal_button ()
 {
   long t;
   long endtime = millis() + timeout;
-  
+
   while ((digitalRead (IN_CAL) == ON) && ((t = millis()) < endtime))  // wait for button release or timeout
-    digitalWrite (LED_CAL, ((endtime-t)/500) % 2);                    // blink LED @ 1Hz
+    digitalWrite (LED_CAL, ((endtime - t) / 500) % 2);                // blink LED @ 1Hz
   delay (100);                                                        // debounce time
   while ((digitalRead (IN_CAL) == OFF) && ((t = millis()) < endtime)) // wait for button press or timeout
-    digitalWrite (LED_CAL, ((endtime-t)/500) % 2);                    // blink LED @ 1 Hz
+    digitalWrite (LED_CAL, ((endtime - t) / 500) % 2);                // blink LED @ 1 Hz
   return millis() < endtime;                                          // no button pressed, timed out
 }
 
@@ -251,9 +254,9 @@ void cal_error (char* msg)
   Serial.println ();
   Serial.print ("--- ");
   Serial.println (msg);
-  for (int i=0; i<10; i++) {
+  for (int i = 0; i < 10; i++) {
     digitalWrite (LED_CAL, ON); delay (50);
-    digitalWrite (LED_CAL, OFF); delay (50);    
+    digitalWrite (LED_CAL, OFF); delay (50);
   }
 }
 
@@ -268,70 +271,69 @@ boolean cal_read_feed ()
   byte b;
   unsigned i;
   long endtime = millis() + timeout;
-  
-  // wait until minimum modulation depth established, or 10s timeout 
-  // abort after timeout in feed calibration 
+
+  // wait until minimum modulation depth established, or 10s timeout
+  // abort after timeout in feed calibration
   calibFeed.max = 0;
-  calibFeed.min = 255;  
-  while (((calibFeed.max < minlevel) || (contrast*calibFeed.max < 100*calibFeed.min)) && (millis() < endtime)) {
-    b = (analogRead (AN_FEED)>>2)^inv;
+  calibFeed.min = 255;
+  while (((calibFeed.max < minlevel) || (contrast * calibFeed.max < 100 * calibFeed.min)) && (millis() < endtime)) {
+    b = (analogRead (AN_FEED) >> 2)^inv;
     if (b > calibFeed.max) calibFeed.max = b;
     else if (b < calibFeed.min) calibFeed.min = b;
   }
   // initial thresholds
-  calibFeed.low = (2*calibFeed.min + calibFeed.max)/3;
-  calibFeed.high = (calibFeed.min + 2*calibFeed.max)/3;
+  calibFeed.low = (2 * calibFeed.min + calibFeed.max) / 3;
+  calibFeed.high = (calibFeed.min + 2 * calibFeed.max) / 3;
 
   // wait for 20 maxima and minima, or new 10s timeout
   if (millis() < endtime) {
     endtime = millis() + timeout;
-    for (i=0; i<20; i++) {
-      
+    for (i = 0; i < 20; i++) {
+
       // wait for feed hole to pass
-      while (( (b = (analogRead (AN_FEED)>>2)^inv) > calibFeed.low) && (millis() < endtime)) {
+      while (( (b = (analogRead (AN_FEED) >> 2)^inv) > calibFeed.low) && (millis() < endtime)) {
         if (b > calibFeed.max) calibFeed.max = b;
-        else if (b < calibFeed.min) calibFeed.min = b;      
+        else if (b < calibFeed.min) calibFeed.min = b;
       }
       digitalWrite (LED_FEED, OFF);
-      
+
       // wait for new feed hole to appear
-      while (( (b = (analogRead (AN_FEED)>>2)^inv) < calibFeed.high) && (millis() < endtime)) {
+      while (( (b = (analogRead (AN_FEED) >> 2)^inv) < calibFeed.high) && (millis() < endtime)) {
         if (b > calibFeed.max) calibFeed.max = b;
-        else if (b < calibFeed.min) calibFeed.min = b;      
+        else if (b < calibFeed.min) calibFeed.min = b;
       }
       digitalWrite (LED_FEED, ON);
-      
+
       // update thresholds
-      calibFeed.low = (2*calibFeed.min + calibFeed.max)/3;
-      calibFeed.high = (calibFeed.min + 2*calibFeed.max)/3;
+      calibFeed.low = (2 * calibFeed.min + calibFeed.max) / 3;
+      calibFeed.high = (calibFeed.min + 2 * calibFeed.max) / 3;
     }
 
     // calculate secondary cal parameters and print feed calibration
-    calibFeed.mid = (calibFeed.min + calibFeed.max)/2;
-    calibFeed.mod = 100 - (100*calibFeed.min)/calibFeed.max;
+    calibFeed.mid = (calibFeed.min + calibFeed.max) / 2;
+    calibFeed.mod = 100 - (100 * calibFeed.min) / calibFeed.max;
   }
-  return (millis() < endtime);  
+  return (millis() < endtime);
 }
 
 // ---------------------------
 // Data sensor calibration.
-// Reads 50 data bytes (triggered by feed track), sets min and max values in calibData record.
+// Reads 100 data bytes (triggered by feed track), sets min and max values in calibData record.
 // Returns true if successful (no timeout).
 // ---------------------------
 
 boolean cal_read_data ()
 {
   byte b;
-  byte ad[8];
   unsigned i, j;
   long endtime;
 
-  for (i=0; i<8; i++) {
+  for (i = 0; i < 8; i++) {
     calibData[i].max = 0;
-    calibData[i].min = 255;  
-  }  
-  
-  for (j=0; j<100; j++) {
+    calibData[i].min = 255;
+  }
+
+  for (j = 0; j < 100; j++) {
 
     // wait for feed hole to go and come, with 10s timeout
     endtime = millis() + timeout;
@@ -344,8 +346,8 @@ boolean cal_read_data ()
     readAnalog();
 
     // process data
-    for (i=0; i<8; i++) {
-      b = ad[i]^inv;
+    for (i = 0; i < 8; i++) {
+      b = ad[i] ^ inv;
       if (b > calibData[i].max) calibData[i].max = b;
       else if (b < calibData[i].min) calibData[i].min = b;
     }
@@ -366,37 +368,37 @@ boolean cal_process_data ()
 
   // identify data bits which meet minimum modulation criterion
   sum_max = 0; sum_min = 0; n_val = 0;
-  for (i=0; i<8; i++) {
-    if ((calibData[i].max > minlevel) && (contrast*calibData[i].max > 100*calibData[i].min)) {   // valid signal and modulation depth
+  for (i = 0; i < 8; i++) {
+    if ((calibData[i].max > minlevel) && (contrast * calibData[i].max > 100 * calibData[i].min)) { // valid signal and modulation depth
       calibData[i].est = false;
       sum_max += calibData[i].max;
       sum_min += calibData[i].min;
       n_val++;
     } else {
-      calibData[i].est = true;      
+      calibData[i].est = true;
     }
   }
 
-  // calculate interpolated values for non-modulated bits, 
+  // calculate interpolated values for non-modulated bits,
   // plus secondary calibration values
   if (n_val > 0) {
-    sum_max = sum_max/n_val;
-    sum_min = sum_min/n_val;
+    sum_max = sum_max / n_val;
+    sum_min = sum_min / n_val;
   } else {
     sum_max = 1;  // avoid div by 0 below
     sum_min = 0;
   }
-  for (i=0; i<8; i++) {
+  for (i = 0; i < 8; i++) {
     if (calibData[i].est) {
       calibData[i].max = sum_max;
       calibData[i].min = sum_min;
     }
-    calibData[i].low = (2*calibData[i].min + calibData[i].max)/3;     // 1/3 above min
-    calibData[i].high = (calibData[i].min + 2*calibData[i].max)/3;    // 1/3 below max
-    calibData[i].mid = (calibData[i].min + calibData[i].max)/2;       // halfway between min and max
-    calibData[i].mod = 100 - (100*calibData[i].min)/calibData[i].max;
+    calibData[i].low = (2 * calibData[i].min + calibData[i].max) / 3; // 1/3 above min
+    calibData[i].high = (calibData[i].min + 2 * calibData[i].max) / 3; // 1/3 below max
+    calibData[i].mid = (calibData[i].min + calibData[i].max) / 2;     // halfway between min and max
+    calibData[i].mod = 100 - (100 * calibData[i].min) / calibData[i].max;
   }
-  return (n_val >= 4);  
+  return (n_val >= 4);
 }
 
 // ---------------------------
@@ -407,7 +409,7 @@ boolean cal_process_data ()
 void calibrate ()
 {
   boolean valid;
-    
+
   // print current calibration status
   Serial.println ();
   Serial.println ("Current calibration:");
@@ -423,22 +425,22 @@ void calibrate ()
     Serial.println ();
     Serial.println ("--- Timeout - using current calibration");
     digitalWrite (LED_CAL, OFF);
-    return;    
+    return;
   }
-  
+
   // feed sensor calibration
   digitalWrite (LED_CAL, ON);
   Serial.println ();
   Serial.println ("*** Calibrating feed sensor. Please feed tape...");
-  
+
   if (cal_read_feed ()) {
     cal_print_feed ();
   } else {
     cal_error ("Timeout waiting for feed holes - using prior calibration");
-    EEPROM.get (addrFeed, calibFeed);   
+    EEPROM.get (addrFeed, calibFeed);
     return;
   }
-  
+
   // data sensor calibration: read 50 data bytes
   Serial.println ();
   Serial.println ("*** Calibrating data sensors. Please keep feeding...");
@@ -446,10 +448,10 @@ void calibrate ()
   if (cal_read_data ()) {
     valid = cal_process_data ();
     cal_print_data ();
-  } else{
+  } else {
     cal_error ("Timeout waiting for data - using prior calibration");
-    EEPROM.get (addrData, calibData);   
-    EEPROM.get (addrFeed, calibFeed);   
+    EEPROM.get (addrData, calibData);
+    EEPROM.get (addrFeed, calibFeed);
     return;
   }
 
@@ -458,11 +460,11 @@ void calibrate ()
   if (valid) {         // need at least three data bits with actual modulation
     Serial.println ("--- Calibration complete and stored");
     EEPROM.put (addrData, calibData);
-    EEPROM.put (addrFeed, calibFeed);    
+    EEPROM.put (addrFeed, calibFeed);
   } else {
     cal_error ("Less than 4 valid data channels - using prior calibration");
-    EEPROM.get (addrData, calibData);    
-    EEPROM.get (addrFeed, calibFeed);    
+    EEPROM.get (addrData, calibData);
+    EEPROM.get (addrFeed, calibFeed);
   }
   Serial.println ();
   digitalWrite (LED_CAL, OFF);
@@ -479,7 +481,6 @@ void calibrate ()
 
 void main_testmode ()
 {
-  byte ad[9];
   byte i;
 
   // capture all 9 inputs
@@ -488,8 +489,20 @@ void main_testmode ()
   TX_OFF;
 
   // display all ADC levels, with inversion as selected by INV jumper
-  for (i=0; i<9; i++) {
+  
+  Serial.println ("live");
+  for (i = 0; i < 9; i++) {
     Serial.print (ad[i]^inv); Serial.print ("\t");
+  }
+  Serial.println ();
+  Serial.println ("max");
+  for (i = 0; i < 9; i++) {
+    Serial.print (adMax[i]^inv); Serial.print ("\t");
+  }
+  Serial.println ();
+  Serial.println ("min");
+  for (i = 0; i < 9; i++) {
+    Serial.print (adMin[i]^inv); Serial.print ("\t");
   }
   Serial.println ();
 }
@@ -502,18 +515,17 @@ void main_testmode ()
 
 void main_runmode ()
 {
-  byte ad[8];
   byte a, b;
   short int i;
   byte valid;
-  
+
   // look for next feed hole.
   TX_ON;                                                    // ready to look for transport hole
-  while (((analogRead (AN_FEED)>>2)^inv) > calibFeed.low)   // wait for prior feed hole to pass
+  while (((analogRead (AN_FEED) >> 2)^inv) > calibFeed.low) // wait for prior feed hole to pass
     if (digitalRead (IN_CAL) == ON) calibrate ();           // calibration button pressed?
   digitalWrite (LED_FEED, OFF);
-  
-  while (((analogRead (AN_FEED)>>2)^inv) < calibFeed.high)  // wait for new feed hole
+
+  while (((analogRead (AN_FEED) >> 2)^inv) < calibFeed.high) // wait for new feed hole
     if (digitalRead (IN_CAL) == ON) calibrate ();           // calibration button pressed?
   digitalWrite (LED_FEED, ON);
   TX_OFF;                                                   // found new transport hole
@@ -527,12 +539,12 @@ void main_runmode ()
   if (digitalRead (IN_5BIT) == OFF) valid = 0xFF;       // 5-bit jumper open: 8-bit mode
   else if (digitalRead (IN_TST) == OFF) valid = 0x3E;   // 5-bit jumper set, TST jumper open: 5-bit mode
   else valid <= 0x7F;                                   // 5-bit jumper and TST jumper set: 7-bit mode
-  
+
   // check for valid data, convert, set quality LED
   digitalWrite (LED_CAL, OFF);
-  for (i=7; i>=0; i--) {
-    b = b<<1;
-    a = ad[i]^inv;
+  for (i = 7; i >= 0; i--) {
+    b = b << 1;
+    a = ad[i] ^ inv;
     if (a > calibData[i].mid) b |= 0x01;    // '1' bit value
     if ((a > calibData[i].low) && (a < calibData[i].high) && (valid & 0x80)) digitalWrite (LED_CAL, ON);    // signal an invalid state
     valid = valid << 1;
@@ -540,14 +552,14 @@ void main_runmode ()
 
   // output the byte to Serial (USB), and to Serial1 (TX) if enabled
   if (digitalRead (IN_5BIT) == OFF) {         // 5-bit jumper open: 8-bit mode
-    Serial.write((char)(255-b));
-    SERIAL_WRITE((char)(255-b));               
-  } else if (digitalRead (IN_TST) == OFF){    // 5-bit jumper set, TST jumper open: 5-bit mode
-    Serial.write((char)(255-(b>>1) & 0x1F));
-    SERIAL_WRITE((char)(255-(b>>1) & 0x1F));   
+    Serial.write((char)(255 - b));
+    SERIAL_WRITE((char)(255 - b));
+  } else if (digitalRead (IN_TST) == OFF) {   // 5-bit jumper set, TST jumper open: 5-bit mode
+    Serial.write((char)(255 - (b >> 1) & 0x1F));
+    SERIAL_WRITE((char)(255 - (b >> 1) & 0x1F));
   } else {                                    // 5-bit jumper and TST jumper set: 7-bit mode
-    Serial.write((char)(255-b & 0x7F));
-    SERIAL_WRITE((char)(255-b & 0x7F));       
+    Serial.write((char)(255 - b & 0x7F));
+    SERIAL_WRITE((char)(255 - b & 0x7F));
   }
 }
 
@@ -556,19 +568,19 @@ void main_runmode ()
 // Poll INV and TST jumpers, call appropriate operating routine
 // ---------------------------
 
-void loop() 
+void loop()
 {
   // Raw ADC input values are high for dark phototransistors;
   // Values will be inverted in normal operation (hole -> light -> high inverted value -> logical 1).
   // If INV jumper is set, don't invert.
-  if (digitalRead (IN_INV) == ON) inv = 0x00; 
+  if (digitalRead (IN_INV) == ON) inv = 0x00;
   else inv = 0xFF;
 
   if ((digitalRead (IN_TST) == ON) and (digitalRead (IN_5BIT) == OFF)) {
-    // if TST jumper is set and 5BIT open, activate test mode: 
+    // if TST jumper is set and 5BIT open, activate test mode:
     // display all ADC values continuously via USB
     main_testmode ();
-  } else { 
+  } else {
     // otherwise, read one byte triggered by feed track and write to USB
     main_runmode ();
   }
@@ -576,13 +588,26 @@ void loop()
 
 void readAnalog()
 {
-    // read all 8 data bits (quickly)
-    ad[0] = analogRead (AN_D0) >> 2;
-    ad[1] = analogRead (AN_D1) >> 2;
-    ad[2] = analogRead (AN_D2) >> 2;
-    ad[3] = analogRead (AN_D3) >> 2;
-    ad[4] = analogRead (AN_D4) >> 2;
-    ad[5] = analogRead (AN_D5) >> 2;
-    ad[6] = analogRead (AN_D6) >> 2;
-    ad[7] = analogRead (AN_D7) >> 2; 
+  // read all 8 data bits (quickly)
+  ad[0] = analogRead (AN_D0) >> 2;
+  ad[1] = analogRead (AN_D1) >> 2;
+  ad[2] = analogRead (AN_D2) >> 2;
+  ad[3] = analogRead (AN_D3) >> 2;
+  ad[4] = analogRead (AN_D4) >> 2;
+  ad[5] = analogRead (AN_D5) >> 2;
+  ad[6] = analogRead (AN_D6) >> 2;
+  ad[7] = analogRead (AN_D7) >> 2;
+  ad[8] = analogRead (AN_FEED) >> 2;
+
+  for(int i=0;i<9;i++)
+  {
+    if(ad[i] > adMax[i])
+    {
+      adMax[i] = ad[i];
+    }
+    if(ad[i] < adMin[i])
+    {
+      adMin[i] = ad[i];
+    }
+  }
 }
